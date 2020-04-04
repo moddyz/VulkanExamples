@@ -1,0 +1,11 @@
+vulkantutorial_program(triangle
+    CPPFILES
+        main.cpp
+    INCLUDE_PATHS
+        ${GLFW_INCLUDE_DIR}
+        ${GLM_INCLUDE_DIR}
+        ${Vulkan_INCLUDE_DIR}
+    LIBRARIES
+        ${GLFW_LIBRARIES}
+        ${Vulkan_LIBRARY}
+)
