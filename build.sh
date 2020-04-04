@@ -8,8 +8,7 @@ CMAKE_ARGS=\
 \ -DGLFW_LOCATION="/apps/glfw/3.3.2/"\
 \ -DGLM_INCLUDE_DIR="/apps/glm/0.9.9.7/include"\
 \ -DVulkan_LIBRARY="/apps/vulkan/1.2.131.2/x86_64/lib/libvulkan.so"\
-\ -DVulkan_INCLUDE_DIR="/apps/vulkan/1.2.131.2/x86_64/include"\
-\ -DCMAKE_BUILD_TYPE="Debug"
+\ -DVulkan_INCLUDE_DIR="/apps/vulkan/1.2.131.2/x86_64/include"
 
 # Only build if installation path not specified.
 if [ $# -eq 0 ]
