@@ -1,35 +1,79 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/mat4x4.hpp>
-#include <glm/vec4.hpp>
+#include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 
-int main() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window =
-        glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
-
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-    std::cout << extensionCount << " extensions supported" << std::endl;
-
-    glm::mat4 matrix;
-    glm::vec4 vec;
-    auto test = matrix * vec;
-
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+/// \class TriangleProgram
+///
+/// Simple program, which initialises a window and draws a triangle in the view using the Vulkan API.
+class TriangleProgram
+{
+public:
+    /// Begin executing the TriangleProgram.
+    void Run()
+    {
+        InitWindow();
+        InitVulkan();
+        MainLoop();
+        Teardown();
     }
 
-    glfwDestroyWindow(window);
+private:
+    // Primvate methods.
 
-    glfwTerminate();
+    // Initialize a window.
+    void InitWindow()
+    {
+        glfwInit();
 
-    return 0;
+        glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
+        glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
+
+        m_window = glfwCreateWindow( m_windowWidth, m_windowHeight, m_windowTitle, nullptr, nullptr );
+    }
+
+    // Initialize the Vulkan instance.
+    void InitVulkan()
+    {
+    }
+
+    // The main event loop.
+    void MainLoop()
+    {
+        while ( !glfwWindowShouldClose( m_window ) )
+        {
+            glfwPollEvents();
+        }
+    }
+
+    // Teardown internal state.
+    void Teardown()
+    {
+        glfwDestroyWindow( m_window );
+        glfwTerminate();
+    }
+
+    // Members.
+    GLFWwindow* m_window       = nullptr;
+    const int   m_windowWidth  = 800;
+    const int   m_windowHeight = 600;
+    const char* m_windowTitle  = "Triangle";
+};
+
+int main()
+{
+    TriangleProgram program;
+    try
+    {
+        program.Run();
+    }
+    catch ( const std::exception& e )
+    {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
