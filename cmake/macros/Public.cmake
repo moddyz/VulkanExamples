@@ -10,6 +10,7 @@ function(vulkanexamples_program PROGRAM_NAME)
         CPPFILES
         INCLUDE_PATHS
         LIBRARIES
+        RESOURCE_FILES
     )
 
     cmake_parse_arguments(args
@@ -43,8 +44,20 @@ function(vulkanexamples_program PROGRAM_NAME)
 
     # Install
     install(
-        TARGETS ${PROGRAM_NAME}
-        DESTINATION bin
+        TARGETS
+            ${PROGRAM_NAME}
+        DESTINATION
+            ${CMAKE_INSTALL_PREFIX}/bin
     )
+
+    # Install resources.
+    if (args_RESOURCE_FILES)
+        install(
+            FILES
+                ${args_RESOURCE_FILES}
+            DESTINATION
+                ${CMAKE_INSTALL_PREFIX}/bin
+        )
+    endif()
 
 endfunction() # vulkanexamples_program
