@@ -7,6 +7,48 @@
 #include <unordered_set>
 #include <vector>
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT      i_messageSeverity,
+                                                     VkDebugUtilsMessageTypeFlagsEXT             i_messageType,
+                                                     const VkDebugUtilsMessengerCallbackDataEXT* i_pCallbackData,
+                                                     void*                                       i_pUserData )
+{
+    std::cerr << "validation layer: " << i_pCallbackData->pMessage << std::endl;
+
+    // Should the vulkan call, which triggered this debug callback, be aborted?
+    return VK_FALSE;
+}
+
+/// Retrieve the create debug messenger function.  It is an extension, so we must fetch the function
+/// pointer with vkGetInstanceProcAddr.
+VkResult CreateDebugUtilsMessengerEXT( VkInstance                                i_instance,
+                                       const VkDebugUtilsMessengerCreateInfoEXT* i_pCreateInfo,
+                                       const VkAllocationCallbacks*              i_pAllocator,
+                                       VkDebugUtilsMessengerEXT*                 o_pDebugMessenger )
+{
+    PFN_vkCreateDebugUtilsMessengerEXT func =
+        ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance, "vkCreateDebugUtilsMessengerEXT" );
+    if ( func != nullptr )
+    {
+        return func( i_instance, i_pCreateInfo, i_pAllocator, o_pDebugMessenger );
+    }
+    else
+    {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugUtilsMessengerEXT( VkInstance                   i_instance,
+                                    VkDebugUtilsMessengerEXT     o_debugMessenger,
+                                    const VkAllocationCallbacks* i_pAllocator )
+{
+    PFN_vkDestroyDebugUtilsMessengerEXT func =
+        ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance, "vkDestroyDebugUtilsMessengerEXT" );
+    if ( func != nullptr )
+    {
+        func( i_instance, o_debugMessenger, i_pAllocator );
+    }
+}
+
 /// \class TriangleProgram
 ///
 /// A simple program which draws a triangle using the Vulkan API, in a window.
@@ -144,14 +186,19 @@ private:
             throw std::runtime_error( "Missing vulkan layers, abort!" );
         }
 
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
         if ( m_enableValidationLayers )
         {
             createInfo.enabledLayerCount   = static_cast< uint32_t >( m_validationLayers.size() );
             createInfo.ppEnabledLayerNames = m_validationLayers.data();
+
+            PopulateDebugMessengerCreateInfo( debugCreateInfo );
+            createInfo.pNext = ( VkDebugUtilsMessengerCreateInfoEXT* ) &debugCreateInfo;
         }
         else
         {
             createInfo.enabledLayerCount = 0;
+            createInfo.pNext = nullptr;
         }
 
         // Check extensions support.
@@ -165,9 +212,39 @@ private:
         createInfo.ppEnabledExtensionNames = extensions.data();
 
         // Create the vulkan instance.
-        if ( vkCreateInstance( &createInfo, nullptr, &m_vulkanInstance ) != VK_SUCCESS )
+        if ( vkCreateInstance( &createInfo, nullptr, &m_instance ) != VK_SUCCESS )
         {
             throw std::runtime_error( "Failed to create vulkan instance." );
+        }
+    }
+
+    /// Utility method for populating the the debug messenger create info.
+    void PopulateDebugMessengerCreateInfo( VkDebugUtilsMessengerCreateInfoEXT& o_createInfo )
+    {
+        o_createInfo                 = {};
+        o_createInfo.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        o_createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        o_createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        o_createInfo.pfnUserCallback = DebugCallback;
+    }
+
+    // Setup the debug messenger.
+    void SetupDebugMessenger()
+    {
+        if ( !m_enableValidationLayers )
+        {
+            return;
+        }
+
+        VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+        PopulateDebugMessengerCreateInfo( createInfo );
+        if ( CreateDebugUtilsMessengerEXT( m_instance, &createInfo, nullptr, &m_debugMessenger ) != VK_SUCCESS )
+        {
+            throw std::runtime_error( "failed to set up debug messenger!" );
         }
     }
 
@@ -175,6 +252,7 @@ private:
     void InitVulkan()
     {
         CreateVulkanInstance();
+        SetupDebugMessenger();
     }
 
     // The main event loop.
@@ -189,7 +267,12 @@ private:
     // Teardown internal state.
     void Teardown()
     {
-        vkDestroyInstance( m_vulkanInstance, nullptr );
+        if ( m_enableValidationLayers )
+        {
+            DestroyDebugUtilsMessengerEXT( m_instance, m_debugMessenger, nullptr );
+        }
+
+        vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
         glfwTerminate();
     }
@@ -211,7 +294,8 @@ private:
     const std::vector< const char* > m_validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
     // Vulkan instance.
-    VkInstance m_vulkanInstance;
+    VkInstance               m_instance;
+    VkDebugUtilsMessengerEXT m_debugMessenger;
 };
 
 int main()
