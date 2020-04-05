@@ -23,5 +23,8 @@ include(Public)
 # Compiler options
 string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
 
+# Debug option.
+set(CMAKE_CXX_FLAGS_DEBUG "-DVULKANEXAMPLES_DEBUG")
+
 # Build targets.
 add_subdirectory(triangle)
