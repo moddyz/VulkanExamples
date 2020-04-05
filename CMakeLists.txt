@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 # Project Name
 project(
-    VulkanTutorial VERSION 0.0
-    DESCRIPTION "Vulkan tutorial."
+    VulkanExamples VERSION 0.0
+    DESCRIPTION "Vulkan examples."
     LANGUAGES CXX
 )
 

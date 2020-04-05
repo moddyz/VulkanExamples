@@ -1,4 +1,4 @@
-vulkantutorial_program(triangle
+vulkanexamples_program(triangle
     CPPFILES
         main.cpp
     INCLUDE_PATHS

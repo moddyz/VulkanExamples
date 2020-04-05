@@ -1,3 +1,3 @@
-# VulkanTutorial
+# VulkanExamples
 
-Code based on tutorial at https://vulkan-tutorial.com/.
+Example programs using the Vulkan API.

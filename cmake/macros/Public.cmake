@@ -1,4 +1,4 @@
-function(vulkantutorial_program PROGRAM_NAME)
+function(vulkanexamples_program PROGRAM_NAME)
 
     set(options
     )
@@ -47,4 +47,4 @@ function(vulkantutorial_program PROGRAM_NAME)
         DESTINATION bin
     )
 
-endfunction() # vulkantutorial_program
+endfunction() # vulkanexamples_program
