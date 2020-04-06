@@ -51,13 +51,13 @@ void DestroyDebugUtilsMessengerEXT( VkInstance                   i_instance,
     }
 }
 
-/// \class TriangleProgram
+/// \class TriangleApplication
 ///
-/// A simple program which draws a triangle using the Vulkan API, in a window.
-class TriangleProgram
+/// A simple app which draws a triangle using the Vulkan API, in a window.
+class TriangleApplication
 {
 public:
-    /// Begin executing the TriangleProgram.
+    /// Begin executing the TriangleApplication.
     void Run()
     {
         InitWindow();
@@ -293,6 +293,7 @@ private:
         return indices;
     }
 
+    /// Check if the the input device \pr i_device is suitable for the current application.
     static bool IsDeviceSuitable( VkPhysicalDevice i_device )
     {
         QueueFamilyIndices indices = FindQueueFamilies( i_device );
@@ -365,7 +366,7 @@ private:
     // Title of the window.
     const char* m_windowTitle = "Triangle";
 
-    // Should validation layers be enabled for this program?
+    // Should validation layers be enabled for this app?
     const bool m_enableValidationLayers = true;
 
     // Available validation layers.
@@ -379,11 +380,11 @@ private:
 
 int main()
 {
-    TriangleProgram program;
+    TriangleApplication app;
 
     try
     {
-        program.Run();
+        app.Run();
     }
     catch ( const std::exception& e )
     {
