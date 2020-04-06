@@ -29,7 +29,7 @@ function(vulkanexamples_program PROGRAM_NAME)
 
     target_compile_features(${PROGRAM_NAME}
         PRIVATE
-            cxx_std_11
+            cxx_std_17
     )
 
     target_include_directories(${PROGRAM_NAME}

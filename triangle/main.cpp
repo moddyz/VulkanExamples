@@ -3,10 +3,12 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
+/// Debug callback handling.
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT      i_messageSeverity,
                                                      VkDebugUtilsMessageTypeFlagsEXT             i_messageType,
                                                      const VkDebugUtilsMessengerCallbackDataEXT* i_pCallbackData,
@@ -65,7 +67,20 @@ public:
     }
 
 private:
-    // Primvate methods.
+    /// \struct QueueFamilyIndices
+    ///
+    /// Internal structure for encoding queue family support, queried from the physical device.
+    struct QueueFamilyIndices
+    {
+        std::optional< uint32_t > m_graphicsFamily;
+
+        /// Convenience method for checking if all the queue families that are required for this application
+        /// are found.
+        bool IsComplete()
+        {
+            return m_graphicsFamily.has_value();
+        }
+    };
 
     // Initialize a window.
     void InitWindow()
@@ -198,7 +213,7 @@ private:
         else
         {
             createInfo.enabledLayerCount = 0;
-            createInfo.pNext = nullptr;
+            createInfo.pNext             = nullptr;
         }
 
         // Check extensions support.
@@ -248,11 +263,74 @@ private:
         }
     }
 
+    /// Query if the current device supports
+    static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice i_device )
+    {
+        QueueFamilyIndices indices;
+
+        // Get available queue families.
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties( i_device, &queueFamilyCount, nullptr );
+        std::vector< VkQueueFamilyProperties > queueFamilies( queueFamilyCount );
+        vkGetPhysicalDeviceQueueFamilyProperties( i_device, &queueFamilyCount, queueFamilies.data() );
+
+        int graphicsFamilyCount = 0;
+        for ( const VkQueueFamilyProperties& queueFamily : queueFamilies )
+        {
+            if ( queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT )
+            {
+                indices.m_graphicsFamily = graphicsFamilyCount;
+            }
+
+            if ( indices.IsComplete() )
+            {
+                break;
+            }
+
+            graphicsFamilyCount++;
+        }
+
+        return indices;
+    }
+
+    static bool IsDeviceSuitable( VkPhysicalDevice i_device )
+    {
+        QueueFamilyIndices indices = FindQueueFamilies( i_device );
+        return indices.IsComplete();
+    }
+
+    void PickPhysicalDevice()
+    {
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices( m_instance, &deviceCount, nullptr );
+        if ( deviceCount == 0 )
+        {
+            throw std::runtime_error( "Failed to find graphics device with Vulkan support." );
+        }
+
+        std::vector< VkPhysicalDevice > devices( deviceCount, VK_NULL_HANDLE );
+        vkEnumeratePhysicalDevices( m_instance, &deviceCount, devices.data() );
+        for ( VkPhysicalDevice device : devices )
+        {
+            if ( IsDeviceSuitable( device ) )
+            {
+                m_physicalDevice = device;
+                break;
+            }
+        }
+
+        if ( m_physicalDevice == VK_NULL_HANDLE )
+        {
+            throw std::runtime_error( "Failed to find suitable graphics device." );
+        }
+    }
+
     // Initialize the Vulkan instance.
     void InitVulkan()
     {
         CreateVulkanInstance();
         SetupDebugMessenger();
+        PickPhysicalDevice();
     }
 
     // The main event loop.
@@ -296,6 +374,7 @@ private:
     // Vulkan instance.
     VkInstance               m_instance;
     VkDebugUtilsMessengerEXT m_debugMessenger;
+    VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE;
 };
 
 int main()
