@@ -364,6 +364,9 @@ private:
         {
             throw std::runtime_error( "Failed to create logical device." );
         }
+
+        // Get a handle to the graphics command queue.
+        vkGetDeviceQueue( m_device, indices.m_graphicsFamily.value(), 0, &m_graphicsQueue );
     }
 
     // Initialize the Vulkan instance.
@@ -418,6 +421,7 @@ private:
     VkDebugUtilsMessengerEXT m_debugMessenger;                  // Debug messenger.
     VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE; // The physical device.
     VkDevice                 m_device;                          // The logical device.
+    VkQueue                  m_graphicsQueue;                   // The graphics queue.
 };
 
 int main()
