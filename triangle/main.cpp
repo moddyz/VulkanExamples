@@ -326,12 +326,53 @@ private:
         }
     }
 
+    void CreateLogicalDevice()
+    {
+        QueueFamilyIndices indices = FindQueueFamilies( m_physicalDevice );
+
+        // Create a single queue, for submitting command buffers to.
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex        = indices.m_graphicsFamily.value();
+        queueCreateInfo.queueCount              = 1;
+        float queuePriority                     = 1.0f;
+        queueCreateInfo.pQueuePriorities        = &queuePriority;
+
+        // No request for any specific features for this application.
+        VkPhysicalDeviceFeatures deviceFeatures = {};
+
+        /// Create logical device.
+        VkDeviceCreateInfo createInfo   = {};
+        createInfo.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        createInfo.pQueueCreateInfos    = &queueCreateInfo;
+        createInfo.queueCreateInfoCount = 1;
+        createInfo.pEnabledFeatures     = &deviceFeatures;
+
+        createInfo.enabledExtensionCount = 0;
+
+        if ( m_enableValidationLayers )
+        {
+            createInfo.enabledLayerCount   = static_cast< uint32_t >( m_validationLayers.size() );
+            createInfo.ppEnabledLayerNames = m_validationLayers.data();
+        }
+        else
+        {
+            createInfo.enabledLayerCount = 0;
+        }
+
+        if ( vkCreateDevice( m_physicalDevice, &createInfo, nullptr, &m_device ) != VK_SUCCESS )
+        {
+            throw std::runtime_error( "Failed to create logical device." );
+        }
+    }
+
     // Initialize the Vulkan instance.
     void InitVulkan()
     {
         CreateVulkanInstance();
         SetupDebugMessenger();
         PickPhysicalDevice();
+        CreateLogicalDevice();
     }
 
     // The main event loop.
@@ -351,6 +392,7 @@ private:
             DestroyDebugUtilsMessengerEXT( m_instance, m_debugMessenger, nullptr );
         }
 
+        vkDestroyDevice( m_device, nullptr );
         vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
         glfwTerminate();
@@ -372,10 +414,10 @@ private:
     // Available validation layers.
     const std::vector< const char* > m_validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
-    // Vulkan instance.
-    VkInstance               m_instance;
-    VkDebugUtilsMessengerEXT m_debugMessenger;
-    VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE;
+    VkInstance               m_instance;                        // Vulkan instance.
+    VkDebugUtilsMessengerEXT m_debugMessenger;                  // Debug messenger.
+    VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE; // The physical device.
+    VkDevice                 m_device;                          // The logical device.
 };
 
 int main()
