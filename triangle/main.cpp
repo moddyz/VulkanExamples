@@ -25,6 +25,16 @@ public:
     }
 
 private:
+    /// \struct SwapChainSupportDetails
+    ///
+    /// Swap chain details.
+    struct SwapChainSupportDetails
+    {
+        VkSurfaceCapabilitiesKHR          m_capabilities;
+        std::vector< VkSurfaceFormatKHR > m_formats;
+        std::vector< VkPresentModeKHR >   m_presentModes;
+    };
+
     /// \struct QueueFamilyIndices
     ///
     /// Internal structure for encoding queue family support, queried from the physical device.
@@ -193,7 +203,7 @@ private:
     }
 
     /// Utility method for populating the the debug messenger create info.
-    void PopulateDebugMessengerCreateInfo( VkDebugUtilsMessengerCreateInfoEXT& o_createInfo )
+    void PopulateDebugMessengerCreateInfo( VkDebugUtilsMessengerCreateInfoEXT& o_createInfo ) const
     {
         o_createInfo                 = {};
         o_createInfo.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -222,8 +232,39 @@ private:
         }
     }
 
+    SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice i_device ) const
+    {
+        SwapChainSupportDetails details;
+
+        // Query capabilities.
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR( i_device, m_surface, &details.m_capabilities );
+
+        // Query available formats
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR( i_device, m_surface, &formatCount, nullptr );
+        if ( formatCount != 0 )
+        {
+            details.m_formats.resize( formatCount );
+            vkGetPhysicalDeviceSurfaceFormatsKHR( i_device, m_surface, &formatCount, details.m_formats.data() );
+        }
+
+        // Presentation modes.
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR( i_device, m_surface, &presentModeCount, nullptr );
+        if ( presentModeCount != 0 )
+        {
+            details.m_presentModes.resize( presentModeCount );
+            vkGetPhysicalDeviceSurfacePresentModesKHR( i_device,
+                                                       m_surface,
+                                                       &presentModeCount,
+                                                       details.m_presentModes.data() );
+        }
+
+        return details;
+    }
+
     /// Query if the current device supports
-    QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice i_device )
+    QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice i_device ) const
     {
         QueueFamilyIndices indices;
 
@@ -261,14 +302,41 @@ private:
         return indices;
     }
 
-    /// Check if the the input device \pr i_device is suitable for the current application.
-    bool IsDeviceSuitable( VkPhysicalDevice i_device )
+    /// Check if the requested extensions are supported, for \p i_device.
+    bool CheckDeviceExtensionSupport( VkPhysicalDevice i_device ) const
     {
-        QueueFamilyIndices indices = FindQueueFamilies( i_device );
-        return indices.IsComplete();
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties( i_device, nullptr, &extensionCount, nullptr );
+
+        std::vector< VkExtensionProperties > availableExtensions( extensionCount );
+        vkEnumerateDeviceExtensionProperties( i_device, nullptr, &extensionCount, availableExtensions.data() );
+
+        std::set< std::string > requiredExtensions( m_deviceExtensions.begin(), m_deviceExtensions.end() );
+        for ( const VkExtensionProperties& extension : availableExtensions )
+        {
+            requiredExtensions.erase( extension.extensionName );
+        }
+
+        return requiredExtensions.empty();
     }
 
-    void PickPhysicalDevice()
+    /// Check if the the input device \pr i_device is suitable for the current application.
+    bool IsDeviceSuitable( VkPhysicalDevice i_device ) const
+    {
+        QueueFamilyIndices indices             = FindQueueFamilies( i_device );
+        bool               extensionsSupported = CheckDeviceExtensionSupport( i_device );
+
+        bool swapChainAdequate = false;
+        if ( extensionsSupported )
+        {
+            SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( i_device );
+            swapChainAdequate = !swapChainSupport.m_formats.empty() && !swapChainSupport.m_presentModes.empty();
+        }
+
+        return indices.IsComplete() && extensionsSupported && swapChainAdequate;
+    }
+
+    void SelectPhysicalDevice()
     {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices( m_instance, &deviceCount, nullptr );
@@ -321,7 +389,8 @@ private:
         createInfo.queueCreateInfoCount = static_cast< uint32_t >( queueCreateInfos.size() );
         createInfo.pEnabledFeatures     = &deviceFeatures;
 
-        createInfo.enabledExtensionCount = 0;
+        createInfo.enabledExtensionCount   = static_cast< uint32_t >( m_deviceExtensions.size() );
+        createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
 
         if ( m_enableValidationLayers )
         {
@@ -388,6 +457,124 @@ private:
         }
     }
 
+    /// Choose a preferred surface format.
+    VkSurfaceFormatKHR SelectSwapSurfaceFormat( const std::vector< VkSurfaceFormatKHR >& i_availableFormats ) const
+    {
+        for ( const VkSurfaceFormatKHR& availableFormat : i_availableFormats )
+        {
+            if ( availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+                 availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR )
+            {
+                return availableFormat;
+            }
+        }
+
+        return i_availableFormats[ 0 ];
+    }
+
+    VkPresentModeKHR SelectSwapPresentMode( const std::vector< VkPresentModeKHR >& i_availablePresentModes ) const
+    {
+        for ( const VkPresentModeKHR& availablePresentMode : i_availablePresentModes )
+        {
+            if ( availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR )
+            {
+                return availablePresentMode;
+            }
+        }
+
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    VkExtent2D SelectSwapExtent( const VkSurfaceCapabilitiesKHR& i_capabilities ) const
+    {
+        if ( i_capabilities.currentExtent.width != UINT32_MAX )
+        {
+            return i_capabilities.currentExtent;
+        }
+        else
+        {
+            VkExtent2D actualExtent = {m_windowWidth, m_windowHeight};
+
+            actualExtent.width  = std::max( i_capabilities.minImageExtent.width,
+                                           std::min( i_capabilities.maxImageExtent.width, actualExtent.width ) );
+            actualExtent.height = std::max( i_capabilities.minImageExtent.height,
+                                            std::min( i_capabilities.maxImageExtent.height, actualExtent.height ) );
+
+            return actualExtent;
+        }
+    }
+
+    void CreateSwapChain()
+    {
+        SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( m_physicalDevice );
+        VkSurfaceFormatKHR      surfaceFormat    = SelectSwapSurfaceFormat( swapChainSupport.m_formats );
+        VkPresentModeKHR        presentMode      = SelectSwapPresentMode( swapChainSupport.m_presentModes );
+        VkExtent2D              extent           = SelectSwapExtent( swapChainSupport.m_capabilities );
+
+        uint32_t imageCount = swapChainSupport.m_capabilities.minImageCount + 1;
+        if ( swapChainSupport.m_capabilities.maxImageCount > 0 &&
+             imageCount > swapChainSupport.m_capabilities.maxImageCount )
+        {
+            imageCount = swapChainSupport.m_capabilities.maxImageCount;
+        }
+
+        // Create the swap chain.
+        VkSwapchainCreateInfoKHR createInfo = {};
+        createInfo.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface                  = m_surface;
+        createInfo.minImageCount            = imageCount;
+        createInfo.imageFormat              = surfaceFormat.format;
+        createInfo.imageColorSpace          = surfaceFormat.colorSpace;
+        createInfo.imageExtent              = extent;
+        createInfo.imageArrayLayers         = 1;
+        createInfo.imageUsage               = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        // Specify how the images in the swap chain will be used across multiple queue families.
+        QueueFamilyIndices indices              = FindQueueFamilies( m_physicalDevice );
+        uint32_t           queueFamilyIndices[] = {indices.m_graphicsFamily.value(), indices.m_presentFamily.value()};
+        if ( indices.m_graphicsFamily != indices.m_presentFamily )
+        {
+            createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices   = queueFamilyIndices;
+        }
+        else
+        {
+            createInfo.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
+            createInfo.queueFamilyIndexCount = 0;       // Optional
+            createInfo.pQueueFamilyIndices   = nullptr; // Optional
+        }
+
+        // No transformation.
+        createInfo.preTransform = swapChainSupport.m_capabilities.currentTransform;
+
+        // Don't alpha-blend with other windows.
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+        // Present mode.
+        createInfo.presentMode = presentMode;
+
+        // Do we care about the color of pixels obscured by a window in the front?
+        createInfo.clipped = VK_TRUE;
+
+        // For later, when we want to create a new optimal swap chain to replace an older one.
+        createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        if ( vkCreateSwapchainKHR( m_device, &createInfo, nullptr, &m_swapChain ) != VK_SUCCESS )
+        {
+            throw std::runtime_error( "failed to create swap chain!" );
+        }
+
+        // Get handles to swap chain images, which we will render into.
+        vkGetSwapchainImagesKHR( m_device, m_swapChain, &imageCount, nullptr );
+        m_swapChainImages.resize( imageCount );
+        vkGetSwapchainImagesKHR( m_device, m_swapChain, &imageCount, m_swapChainImages.data() );
+
+        // Cache image format & extent.
+        m_swapChainImageFormat = surfaceFormat.format;
+        m_swapChainExtent      = extent;
+    }
+
     void CreateSurface()
     {
         if ( glfwCreateWindowSurface( m_instance, m_window, nullptr, &m_surface ) != VK_SUCCESS )
@@ -402,8 +589,9 @@ private:
         CreateVulkanInstance();
         SetupDebugMessenger();
         CreateSurface();
-        PickPhysicalDevice();
+        SelectPhysicalDevice();
         CreateLogicalDevice();
+        CreateSwapChain();
     }
 
     // The main event loop.
@@ -415,16 +603,17 @@ private:
         }
     }
 
-    // Teardown internal state.
+    // Teardown internal state, in reverse order of initiailization.
     void Teardown()
     {
+        vkDestroySwapchainKHR( m_device, m_swapChain, nullptr );
+        vkDestroyDevice( m_device, nullptr );
+        vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         if ( m_enableValidationLayers )
         {
             DestroyDebugUtilsMessengerEXT( m_instance, m_debugMessenger, nullptr );
         }
 
-        vkDestroyDevice( m_device, nullptr );
-        vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
         glfwTerminate();
@@ -434,8 +623,8 @@ private:
     GLFWwindow* m_window = nullptr;
 
     // Dimensions of the window.
-    const int m_windowWidth  = 800;
-    const int m_windowHeight = 600;
+    const uint32_t m_windowWidth  = 800;
+    const uint32_t m_windowHeight = 600;
 
     // Title of the window.
     const char* m_windowTitle = "Triangle";
@@ -446,6 +635,9 @@ private:
     // Available validation layers.
     const std::vector< const char* > m_validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
+    // Device extensions.
+    const std::vector< const char* > m_deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
     VkInstance               m_instance;                        // Vulkan instance.
     VkDebugUtilsMessengerEXT m_debugMessenger;                  // Debug messenger.
     VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE; // The physical device.
@@ -453,6 +645,14 @@ private:
     VkQueue                  m_graphicsQueue;                   // The graphics queue.
     VkQueue                  m_presentQueue;                    // Presentation queue.
     VkSurfaceKHR             m_surface;                         // Surface to render on.
+
+    // The swap chain, representing the queue of images to be presented to the screen.
+    VkSwapchainKHR m_swapChain;
+
+    // Handles to images in the swap chain.
+    std::vector< VkImage > m_swapChainImages;
+    VkFormat               m_swapChainImageFormat;
+    VkExtent2D             m_swapChainExtent;
 };
 
 int main()
