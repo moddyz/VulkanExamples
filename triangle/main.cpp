@@ -4,52 +4,10 @@
 #include <cstdlib>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <unordered_set>
 #include <vector>
-
-/// Debug callback handling.
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT      i_messageSeverity,
-                                                     VkDebugUtilsMessageTypeFlagsEXT             i_messageType,
-                                                     const VkDebugUtilsMessengerCallbackDataEXT* i_pCallbackData,
-                                                     void*                                       i_pUserData )
-{
-    std::cerr << "validation layer: " << i_pCallbackData->pMessage << std::endl;
-
-    // Should the vulkan call, which triggered this debug callback, be aborted?
-    return VK_FALSE;
-}
-
-/// Retrieve the create debug messenger function.  It is an extension, so we must fetch the function
-/// pointer with vkGetInstanceProcAddr.
-VkResult CreateDebugUtilsMessengerEXT( VkInstance                                i_instance,
-                                       const VkDebugUtilsMessengerCreateInfoEXT* i_pCreateInfo,
-                                       const VkAllocationCallbacks*              i_pAllocator,
-                                       VkDebugUtilsMessengerEXT*                 o_pDebugMessenger )
-{
-    PFN_vkCreateDebugUtilsMessengerEXT func =
-        ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance, "vkCreateDebugUtilsMessengerEXT" );
-    if ( func != nullptr )
-    {
-        return func( i_instance, i_pCreateInfo, i_pAllocator, o_pDebugMessenger );
-    }
-    else
-    {
-        return VK_ERROR_EXTENSION_NOT_PRESENT;
-    }
-}
-
-void DestroyDebugUtilsMessengerEXT( VkInstance                   i_instance,
-                                    VkDebugUtilsMessengerEXT     o_debugMessenger,
-                                    const VkAllocationCallbacks* i_pAllocator )
-{
-    PFN_vkDestroyDebugUtilsMessengerEXT func =
-        ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance, "vkDestroyDebugUtilsMessengerEXT" );
-    if ( func != nullptr )
-    {
-        func( i_instance, o_debugMessenger, i_pAllocator );
-    }
-}
 
 /// \class TriangleApplication
 ///
@@ -73,12 +31,13 @@ private:
     struct QueueFamilyIndices
     {
         std::optional< uint32_t > m_graphicsFamily;
+        std::optional< uint32_t > m_presentFamily;
 
         /// Convenience method for checking if all the queue families that are required for this application
         /// are found.
         bool IsComplete()
         {
-            return m_graphicsFamily.has_value();
+            return m_graphicsFamily.has_value() && m_presentFamily.has_value();
         }
     };
 
@@ -264,7 +223,7 @@ private:
     }
 
     /// Query if the current device supports
-    static QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice i_device )
+    QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice i_device )
     {
         QueueFamilyIndices indices;
 
@@ -275,26 +234,35 @@ private:
         vkGetPhysicalDeviceQueueFamilyProperties( i_device, &queueFamilyCount, queueFamilies.data() );
 
         int graphicsFamilyCount = 0;
-        for ( const VkQueueFamilyProperties& queueFamily : queueFamilies )
+        for ( size_t familyIndex = 0; familyIndex < queueFamilies.size(); ++familyIndex )
         {
+            const VkQueueFamilyProperties& queueFamily = queueFamilies[ familyIndex ];
+
+            // Present support.
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR( i_device, familyIndex, m_surface, &presentSupport );
+            if ( presentSupport )
+            {
+                indices.m_presentFamily = familyIndex;
+            }
+
+            // Graphics support.
             if ( queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT )
             {
-                indices.m_graphicsFamily = graphicsFamilyCount;
+                indices.m_graphicsFamily = familyIndex;
             }
 
             if ( indices.IsComplete() )
             {
                 break;
             }
-
-            graphicsFamilyCount++;
         }
 
         return indices;
     }
 
     /// Check if the the input device \pr i_device is suitable for the current application.
-    static bool IsDeviceSuitable( VkPhysicalDevice i_device )
+    bool IsDeviceSuitable( VkPhysicalDevice i_device )
     {
         QueueFamilyIndices indices = FindQueueFamilies( i_device );
         return indices.IsComplete();
@@ -330,13 +298,18 @@ private:
     {
         QueueFamilyIndices indices = FindQueueFamilies( m_physicalDevice );
 
-        // Create a single queue, for submitting command buffers to.
-        VkDeviceQueueCreateInfo queueCreateInfo = {};
-        queueCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex        = indices.m_graphicsFamily.value();
-        queueCreateInfo.queueCount              = 1;
-        float queuePriority                     = 1.0f;
-        queueCreateInfo.pQueuePriorities        = &queuePriority;
+        std::vector< VkDeviceQueueCreateInfo > queueCreateInfos;
+        std::set< uint32_t > uniqueQueueFamilies = {indices.m_graphicsFamily.value(), indices.m_presentFamily.value()};
+        float                queuePriority       = 1.0f;
+        for ( uint32_t queueFamily : uniqueQueueFamilies )
+        {
+            VkDeviceQueueCreateInfo queueCreateInfo = {};
+            queueCreateInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex        = queueFamily;
+            queueCreateInfo.queueCount              = 1;
+            queueCreateInfo.pQueuePriorities        = &queuePriority;
+            queueCreateInfos.push_back( queueCreateInfo );
+        }
 
         // No request for any specific features for this application.
         VkPhysicalDeviceFeatures deviceFeatures = {};
@@ -344,8 +317,8 @@ private:
         /// Create logical device.
         VkDeviceCreateInfo createInfo   = {};
         createInfo.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pQueueCreateInfos    = &queueCreateInfo;
-        createInfo.queueCreateInfoCount = 1;
+        createInfo.pQueueCreateInfos    = queueCreateInfos.data();
+        createInfo.queueCreateInfoCount = static_cast< uint32_t >( queueCreateInfos.size() );
         createInfo.pEnabledFeatures     = &deviceFeatures;
 
         createInfo.enabledExtensionCount = 0;
@@ -367,6 +340,60 @@ private:
 
         // Get a handle to the graphics command queue.
         vkGetDeviceQueue( m_device, indices.m_graphicsFamily.value(), 0, &m_graphicsQueue );
+        vkGetDeviceQueue( m_device, indices.m_presentFamily.value(), 0, &m_presentQueue );
+    }
+
+    /// Debug callback handling.
+    static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT      i_messageSeverity,
+                                                         VkDebugUtilsMessageTypeFlagsEXT             i_messageType,
+                                                         const VkDebugUtilsMessengerCallbackDataEXT* i_pCallbackData,
+                                                         void*                                       i_pUserData )
+    {
+        std::cerr << "validation layer: " << i_pCallbackData->pMessage << std::endl;
+
+        // Should the vulkan call, which triggered this debug callback, be aborted?
+        return VK_FALSE;
+    }
+
+    /// Retrieve the create debug messenger function.  It is an extension, so we must fetch the function
+    /// pointer with vkGetInstanceProcAddr.
+    VkResult CreateDebugUtilsMessengerEXT( VkInstance                                i_instance,
+                                           const VkDebugUtilsMessengerCreateInfoEXT* i_pCreateInfo,
+                                           const VkAllocationCallbacks*              i_pAllocator,
+                                           VkDebugUtilsMessengerEXT*                 o_pDebugMessenger )
+    {
+        PFN_vkCreateDebugUtilsMessengerEXT func =
+            ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance,
+                                                                          "vkCreateDebugUtilsMessengerEXT" );
+        if ( func != nullptr )
+        {
+            return func( i_instance, i_pCreateInfo, i_pAllocator, o_pDebugMessenger );
+        }
+        else
+        {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
+    }
+
+    void DestroyDebugUtilsMessengerEXT( VkInstance                   i_instance,
+                                        VkDebugUtilsMessengerEXT     o_debugMessenger,
+                                        const VkAllocationCallbacks* i_pAllocator )
+    {
+        PFN_vkDestroyDebugUtilsMessengerEXT func =
+            ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( i_instance,
+                                                                           "vkDestroyDebugUtilsMessengerEXT" );
+        if ( func != nullptr )
+        {
+            func( i_instance, o_debugMessenger, i_pAllocator );
+        }
+    }
+
+    void CreateSurface()
+    {
+        if ( glfwCreateWindowSurface( m_instance, m_window, nullptr, &m_surface ) != VK_SUCCESS )
+        {
+            throw std::runtime_error( "Failed to create window surface." );
+        }
     }
 
     // Initialize the Vulkan instance.
@@ -374,6 +401,7 @@ private:
     {
         CreateVulkanInstance();
         SetupDebugMessenger();
+        CreateSurface();
         PickPhysicalDevice();
         CreateLogicalDevice();
     }
@@ -396,6 +424,7 @@ private:
         }
 
         vkDestroyDevice( m_device, nullptr );
+        vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
         glfwTerminate();
@@ -422,6 +451,8 @@ private:
     VkPhysicalDevice         m_physicalDevice = VK_NULL_HANDLE; // The physical device.
     VkDevice                 m_device;                          // The logical device.
     VkQueue                  m_graphicsQueue;                   // The graphics queue.
+    VkQueue                  m_presentQueue;                    // Presentation queue.
+    VkSurfaceKHR             m_surface;                         // Surface to render on.
 };
 
 int main()
