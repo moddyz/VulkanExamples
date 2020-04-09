@@ -8,4 +8,7 @@ vulkanexamples_program(triangle
     LIBRARIES
         ${GLFW_LIBRARIES}
         ${Vulkan_LIBRARY}
+    SHADERS
+        shader.vert
+        shader.frag
 )

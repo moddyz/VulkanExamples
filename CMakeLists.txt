@@ -16,6 +16,15 @@ endif()
 list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake/modules")
 find_package(GLFW REQUIRED)
 find_package(Vulkan REQUIRED)
+find_program(GLSLC glslc HINTS ${Vulkan_SDK}/bin REQUIRED)
+if (EXISTS ${GLSLC})
+    message(STATUS "Found glslc: ${GLSLC}")
+else()
+    message(FATAL_ERROR
+            "glslc not found, required for compiling shaders.")
+endif()
+
+
 
 list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake/macros")
 include(Public)

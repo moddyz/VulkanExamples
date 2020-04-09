@@ -613,6 +613,11 @@ private:
         }
     }
 
+    void CreateGraphicsPipeline()
+    {
+
+    }
+
     // Initialize the Vulkan instance.
     void InitVulkan()
     {
@@ -623,6 +628,7 @@ private:
         CreateLogicalDevice();
         CreateSwapChain();
         CreateImageViews();
+        CreateGraphicsPipeline();
     }
 
     // The main event loop.
