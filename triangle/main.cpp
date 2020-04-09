@@ -583,6 +583,36 @@ private:
         }
     }
 
+    void CreateImageViews()
+    {
+        m_swapChainImageViews.resize( m_swapChainImages.size() );
+        for ( size_t imageIndex = 0; imageIndex < m_swapChainImages.size(); imageIndex++ )
+        {
+            VkImageViewCreateInfo createInfo = {};
+            createInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            createInfo.image                 = m_swapChainImages[ imageIndex ];
+            createInfo.viewType              = VK_IMAGE_VIEW_TYPE_2D;
+            createInfo.format                = m_swapChainImageFormat;
+
+            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            createInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+            createInfo.subresourceRange.baseMipLevel   = 0;
+            createInfo.subresourceRange.levelCount     = 1;
+            createInfo.subresourceRange.baseArrayLayer = 0;
+            createInfo.subresourceRange.layerCount     = 1;
+
+            if ( vkCreateImageView( m_device, &createInfo, nullptr, &m_swapChainImageViews[ imageIndex ] ) !=
+                 VK_SUCCESS )
+            {
+                throw std::runtime_error( "failed to create image views!" );
+            }
+        }
+    }
+
     // Initialize the Vulkan instance.
     void InitVulkan()
     {
@@ -592,6 +622,7 @@ private:
         SelectPhysicalDevice();
         CreateLogicalDevice();
         CreateSwapChain();
+        CreateImageViews();
     }
 
     // The main event loop.
@@ -606,6 +637,11 @@ private:
     // Teardown internal state, in reverse order of initiailization.
     void Teardown()
     {
+        for ( VkImageView imageView : m_swapChainImageViews )
+        {
+            vkDestroyImageView( m_device, imageView, nullptr );
+        }
+
         vkDestroySwapchainKHR( m_device, m_swapChain, nullptr );
         vkDestroyDevice( m_device, nullptr );
         vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
@@ -650,9 +686,10 @@ private:
     VkSwapchainKHR m_swapChain;
 
     // Handles to images in the swap chain.
-    std::vector< VkImage > m_swapChainImages;
-    VkFormat               m_swapChainImageFormat;
-    VkExtent2D             m_swapChainExtent;
+    std::vector< VkImage >     m_swapChainImages;
+    std::vector< VkImageView > m_swapChainImageViews;
+    VkFormat                   m_swapChainImageFormat;
+    VkExtent2D                 m_swapChainExtent;
 };
 
 int main()
