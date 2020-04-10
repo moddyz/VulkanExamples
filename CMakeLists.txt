@@ -24,15 +24,14 @@ else()
             "glslc not found, required for compiling shaders.")
 endif()
 
-
-
+# Add convenience macros.
 list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake/macros")
 include(Public)
 
-# Compiler options
+# Compiler options - leave no symbols un-defined!
 string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
 
-# Debug option.
+# Custom debug define.
 set(CMAKE_CXX_FLAGS_DEBUG "-DVULKANEXAMPLES_DEBUG")
 
 # Build targets.
