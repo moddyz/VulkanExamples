@@ -41,6 +41,25 @@ static std::string JoinPaths( const std::string& i_pathA, const std::string& i_p
     return SanitizePath( path );
 }
 
+/// Read a file, and return the array of binary data.
+static std::vector< char > ReadFile( const std::string& i_filePath )
+{
+    std::ifstream file( i_filePath, std::ios::ate | std::ios::binary );
+    if ( !file.is_open() )
+    {
+        throw std::runtime_error( "failed to open file!" );
+    }
+
+    // Read the entire file.
+    size_t              fileSize = ( size_t ) file.tellg();
+    std::vector< char > buffer( fileSize );
+    file.seekg( 0 );
+    file.read( buffer.data(), fileSize );
+    file.close();
+
+    return buffer;
+}
+
 static constexpr int s_maxFramesInFlight = 2;
 
 /// \class TriangleApplication
@@ -90,23 +109,10 @@ private:
         }
     };
 
-    /// Read a file, and return the array of binary data.
-    static std::vector< char > ReadFile( const std::string& i_filePath )
+    static void FramebufferResizeCallback( GLFWwindow* i_window, int i_width, int i_height )
     {
-        std::ifstream file( i_filePath, std::ios::ate | std::ios::binary );
-        if ( !file.is_open() )
-        {
-            throw std::runtime_error( "failed to open file!" );
-        }
-
-        // Read the entire file.
-        size_t              fileSize = ( size_t ) file.tellg();
-        std::vector< char > buffer( fileSize );
-        file.seekg( 0 );
-        file.read( buffer.data(), fileSize );
-        file.close();
-
-        return buffer;
+        TriangleApplication* app  = reinterpret_cast< TriangleApplication* >( glfwGetWindowUserPointer( i_window ) );
+        app->m_framebufferResized = true;
     }
 
     // Initialize a window.
@@ -115,9 +121,10 @@ private:
         glfwInit();
 
         glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-        glfwWindowHint( GLFW_RESIZABLE, GLFW_TRUE );
 
         m_window = glfwCreateWindow( m_windowWidth, m_windowHeight, m_windowTitle, nullptr, nullptr );
+        glfwSetWindowUserPointer( m_window, this );
+        glfwSetFramebufferSizeCallback( m_window, FramebufferResizeCallback );
     }
 
     bool CheckVulkanLayersSupport( const std::vector< const char* >& i_requestedLayers ) const
@@ -661,8 +668,18 @@ private:
 
     void RecreateSwapChain()
     {
+        // Pause application on minimization.
+        int width = 0, height = 0;
+        do
+        {
+            glfwGetFramebufferSize( m_window, &width, &height );
+            glfwWaitEvents();
+        } while ( width == 0 || height == 0 );
+
         // Wait for graphics operations to complete.
         vkDeviceWaitIdle( m_device );
+
+        m_framebufferResized = false;
 
         TeardownSwapChain();
 
@@ -1180,7 +1197,7 @@ private:
 
         // Present!
         result = vkQueuePresentKHR( m_presentQueue, &presentInfo );
-        if ( result == VK_ERROR_OUT_OF_DATE_KHR || result != VK_SUBOPTIMAL_KHR )
+        if ( result == VK_ERROR_OUT_OF_DATE_KHR || result != VK_SUBOPTIMAL_KHR || m_framebufferResized )
         {
             RecreateSwapChain();
             return;
@@ -1290,6 +1307,9 @@ private:
     std::vector< VkFence >     m_inFlightFences;
     std::vector< VkFence >     m_imagesInFlight;
     size_t                     m_currentFrame = 0;
+
+    // Check if frame buffer requires a resize.
+    bool m_framebufferResized = false;
 };
 
 int main( int i_argc, char** i_argv )
