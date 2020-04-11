@@ -115,7 +115,7 @@ private:
         glfwInit();
 
         glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-        glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
+        glfwWindowHint( GLFW_RESIZABLE, GLFW_TRUE );
 
         m_window = glfwCreateWindow( m_windowWidth, m_windowHeight, m_windowTitle, nullptr, nullptr );
     }
@@ -543,7 +543,7 @@ private:
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
-    VkExtent2D SelectSwapExtent( const VkSurfaceCapabilitiesKHR& i_capabilities ) const
+    VkExtent2D SelectSwapExtent( const VkSurfaceCapabilitiesKHR& i_capabilities )
     {
         if ( i_capabilities.currentExtent.width != UINT32_MAX )
         {
@@ -551,7 +551,9 @@ private:
         }
         else
         {
-            VkExtent2D actualExtent = {m_windowWidth, m_windowHeight};
+            int width, height;
+            glfwGetFramebufferSize( m_window, &width, &height );
+            VkExtent2D actualExtent = {( uint32_t ) width, ( uint32_t ) height};
 
             actualExtent.width  = std::max( i_capabilities.minImageExtent.width,
                                            std::min( i_capabilities.maxImageExtent.width, actualExtent.width ) );
@@ -631,6 +633,45 @@ private:
         // Cache image format & extent.
         m_swapChainImageFormat = surfaceFormat.format;
         m_swapChainExtent      = extent;
+    }
+
+    void TeardownSwapChain()
+    {
+        for ( VkFramebuffer framebuffer : m_swapChainFramebuffers )
+        {
+            vkDestroyFramebuffer( m_device, framebuffer, nullptr );
+        }
+
+        vkFreeCommandBuffers( m_device,
+                              m_commandPool,
+                              static_cast< uint32_t >( m_commandBuffers.size() ),
+                              m_commandBuffers.data() );
+
+        vkDestroyPipeline( m_device, m_graphicsPipeline, nullptr );
+        vkDestroyPipelineLayout( m_device, m_pipelineLayout, nullptr );
+        vkDestroyRenderPass( m_device, m_renderPass, nullptr );
+
+        for ( VkImageView imageView : m_swapChainImageViews )
+        {
+            vkDestroyImageView( m_device, imageView, nullptr );
+        }
+
+        vkDestroySwapchainKHR( m_device, m_swapChain, nullptr );
+    }
+
+    void RecreateSwapChain()
+    {
+        // Wait for graphics operations to complete.
+        vkDeviceWaitIdle( m_device );
+
+        TeardownSwapChain();
+
+        CreateSwapChain();
+        CreateImageViews();
+        CreateRenderPass();
+        CreateGraphicsPipeline();
+        CreateFramebuffers();
+        CreateCommandBuffers();
     }
 
     void CreateSurface()
@@ -1069,12 +1110,23 @@ private:
 
         // Acquire an image from the swap chain.
         uint32_t imageIndex;
-        vkAcquireNextImageKHR( m_device,
-                               m_swapChain,
-                               /*timeOut*/ UINT64_MAX,
-                               m_imageAvailableSemaphores[ m_currentFrame ],
-                               VK_NULL_HANDLE,
-                               &imageIndex );
+        VkResult result = vkAcquireNextImageKHR( m_device,
+                                                 m_swapChain,
+                                                 /*timeOut*/ UINT64_MAX,
+                                                 m_imageAvailableSemaphores[ m_currentFrame ],
+                                                 VK_NULL_HANDLE,
+                                                 &imageIndex );
+
+        // Is the swap-chain sub-optimal?
+        if ( result == VK_ERROR_OUT_OF_DATE_KHR )
+        {
+            RecreateSwapChain();
+            return;
+        }
+        else if ( result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR )
+        {
+            throw std::runtime_error( "Failed to acquire swap chain image." );
+        }
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on)
         if ( m_imagesInFlight[ imageIndex ] != VK_NULL_HANDLE )
@@ -1127,7 +1179,16 @@ private:
         presentInfo.pResults = nullptr; // Optional
 
         // Present!
-        vkQueuePresentKHR( m_presentQueue, &presentInfo );
+        result = vkQueuePresentKHR( m_presentQueue, &presentInfo );
+        if ( result == VK_ERROR_OUT_OF_DATE_KHR || result != VK_SUBOPTIMAL_KHR )
+        {
+            RecreateSwapChain();
+            return;
+        }
+        else if ( result != VK_SUCCESS )
+        {
+            throw std::runtime_error( "Failed to acquire swap chain image." );
+        }
 
         // Increment frame.
         m_currentFrame = ( m_currentFrame + 1 ) % s_maxFramesInFlight;
@@ -1150,37 +1211,24 @@ private:
     // Teardown internal state, in reverse order of initialization.
     void Teardown()
     {
+        TeardownSwapChain();
+
         for ( size_t frameIndex = 0; frameIndex < s_maxFramesInFlight; ++frameIndex )
         {
             vkDestroySemaphore( m_device, m_renderFinishedSemaphores[ frameIndex ], nullptr );
             vkDestroySemaphore( m_device, m_imageAvailableSemaphores[ frameIndex ], nullptr );
-            vkDestroyFramebuffer( m_device, m_inFlightFences[ frameIndex ], nullptr );
+            vkDestroyFence( m_device, m_inFlightFences[ frameIndex ], nullptr );
         }
 
         vkDestroyCommandPool( m_device, m_commandPool, nullptr );
 
-        for ( VkFramebuffer framebuffer : m_swapChainFramebuffers )
-        {
-            vkDestroyFramebuffer( m_device, framebuffer, nullptr );
-        }
-
-        vkDestroyPipeline( m_device, m_graphicsPipeline, nullptr );
-        vkDestroyPipelineLayout( m_device, m_pipelineLayout, nullptr );
-        vkDestroyRenderPass( m_device, m_renderPass, nullptr );
-
-        for ( VkImageView imageView : m_swapChainImageViews )
-        {
-            vkDestroyImageView( m_device, imageView, nullptr );
-        }
-
-        vkDestroySwapchainKHR( m_device, m_swapChain, nullptr );
-        vkDestroyDevice( m_device, nullptr );
-        vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         if ( m_enableValidationLayers )
         {
             DestroyDebugUtilsMessengerEXT( m_instance, m_debugMessenger, nullptr );
         }
 
+        vkDestroyDevice( m_device, nullptr );
+        vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
         glfwTerminate();
@@ -1193,8 +1241,8 @@ private:
     GLFWwindow* m_window = nullptr;
 
     // Dimensions of the window.
-    const uint32_t m_windowWidth  = 800;
-    const uint32_t m_windowHeight = 600;
+    int m_windowWidth  = 800;
+    int m_windowHeight = 600;
 
     // Title of the window.
     const char* m_windowTitle = "Triangle";
