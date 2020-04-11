@@ -1221,13 +1221,13 @@ private:
         }
 
         vkDestroyCommandPool( m_device, m_commandPool, nullptr );
+        vkDestroyDevice( m_device, nullptr );
 
         if ( m_enableValidationLayers )
         {
             DestroyDebugUtilsMessengerEXT( m_instance, m_debugMessenger, nullptr );
         }
 
-        vkDestroyDevice( m_device, nullptr );
         vkDestroySurfaceKHR( m_instance, m_surface, nullptr );
         vkDestroyInstance( m_instance, nullptr );
         glfwDestroyWindow( m_window );
