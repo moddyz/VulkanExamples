@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.17)
 
 # Project Name
 project(
-    VulkanExamples VERSION 0.0
-    DESCRIPTION "Vulkan examples."
+    VulkanExperiments VERSION 0.0
+    DESCRIPTION "Experiments with the Vulkan Graphics API."
     LANGUAGES CXX
 )
 
@@ -27,6 +27,7 @@ endif()
 # Add convenience macros.
 list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake/macros")
 include(Public)
+include(Vulkan)
 
 # Compiler options - leave no symbols un-defined!
 string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
@@ -35,4 +36,4 @@ string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
 set(CMAKE_CXX_FLAGS_DEBUG "-DVULKANEXAMPLES_DEBUG")
 
 # Build targets.
-add_subdirectory(triangle)
+add_subdirectory(experiments)

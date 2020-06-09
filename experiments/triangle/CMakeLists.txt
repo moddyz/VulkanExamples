@@ -1,4 +1,6 @@
-vulkanexamples_program(triangle
+set(PROGRAM_NAME "triangle")
+
+cpp_program(${PROGRAM_NAME}
     CPPFILES
         main.cpp
     INCLUDE_PATHS
@@ -8,7 +10,7 @@ vulkanexamples_program(triangle
     LIBRARIES
         ${GLFW_LIBRARIES}
         ${Vulkan_LIBRARY}
-    SHADERS
-        shader.vert
-        shader.frag
 )
+
+vulkan_shader(${PROGRAM_NAME} shader.vert)
+vulkan_shader(${PROGRAM_NAME} shader.frag)
