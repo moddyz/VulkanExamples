@@ -1,9 +1,6 @@
 # VulkanExperiments
 
-Experiments with the Vulkan Graphics API.
-
-## Experiments
-
+Experiments with the Vulkan Graphics API:
 - [triangle](experiments/triangle)
 
 ## Requirements
