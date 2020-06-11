@@ -1,7 +1,7 @@
 # VulkanExperiments
 
 Experiments with the Vulkan Graphics API:
-- [triangle](experiments/triangle)
+- [triangle](src/experiments/triangle)
 
 ## Requirements
 

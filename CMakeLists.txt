@@ -36,4 +36,4 @@ string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
 set(CMAKE_CXX_FLAGS_DEBUG "-DVULKANEXAMPLES_DEBUG")
 
 # Build targets.
-add_subdirectory(experiments)
+add_subdirectory(src)

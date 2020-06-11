@@ -10,6 +10,7 @@ cpp_program(${PROGRAM_NAME}
     LIBRARIES
         ${GLFW_LIBRARIES}
         ${Vulkan_LIBRARY}
+        vkbase
 )
 
 vulkan_shader(${PROGRAM_NAME} shader.vert)
