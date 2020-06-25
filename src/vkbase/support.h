@@ -6,7 +6,6 @@
 
 namespace vkbase
 {
-
 /// Check if the validation layers \p i_requestedLayers are supported.
 bool CheckVulkanLayersSupport( const std::vector< const char* >& i_requestedLayers )
 {
@@ -77,4 +76,4 @@ bool CheckVulkanExtensionsSupport( const std::vector< const char* >& i_requested
     return missingExtensionsCount == 0;
 }
 
-} // vkbase
+} // namespace vkbase

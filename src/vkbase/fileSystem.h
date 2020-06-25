@@ -6,7 +6,6 @@
 
 namespace vkbase
 {
-
 /// Functor for backslash '/' detection.
 struct BothSlashes
 {
@@ -71,4 +70,4 @@ inline std::vector< char > ReadFile( const std::string& i_filePath )
     return buffer;
 }
 
-} // vkbase
+} // namespace vkbase
