@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <vkbase/fileSystem.h>
+#include <vkbase/support.h>
 
 static constexpr int s_maxFramesInFlight = 2;
 
@@ -82,76 +83,6 @@ private:
         glfwSetFramebufferSizeCallback( m_window, FramebufferResizeCallback );
     }
 
-    bool CheckVulkanLayersSupport( const std::vector< const char* >& i_requestedLayers ) const
-    {
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties( &layerCount, nullptr );
-        std::vector< VkLayerProperties > availableLayers( layerCount );
-        vkEnumerateInstanceLayerProperties( &layerCount, availableLayers.data() );
-
-        // Validation layer set.
-        std::unordered_set< std::string > availableLayersSet;
-        for ( const VkLayerProperties& layer : availableLayers )
-        {
-            availableLayersSet.insert( std::string( layer.layerName ) );
-        }
-
-        // Check that each requested extension is available.
-        size_t missingLayersCount = 0;
-        for ( const char* layerName : i_requestedLayers )
-        {
-            std::unordered_set< std::string >::const_iterator layerIt =
-                availableLayersSet.find( std::string( layerName ) );
-
-            if ( layerIt != availableLayersSet.end() )
-            {
-                printf( "Found requested Vulkan layer: %s.\n", layerName );
-            }
-            else
-            {
-                printf( "Missing requested Vulkan layer: %s.\n", layerName );
-                missingLayersCount++;
-            }
-        }
-
-        return missingLayersCount == 0;
-    }
-
-    // Query available vulkan extensions, and validate against the \p i_requestedExtensions array.
-    bool CheckVulkanExtensionsSupport( const std::vector< const char* >& i_requestedExtensions ) const
-    {
-        uint32_t availableExtensionsCount = 0;
-        vkEnumerateInstanceExtensionProperties( nullptr, &availableExtensionsCount, nullptr );
-        std::vector< VkExtensionProperties > availableExtensions( availableExtensionsCount );
-        vkEnumerateInstanceExtensionProperties( nullptr, &availableExtensionsCount, availableExtensions.data() );
-
-        std::unordered_set< std::string > availableExtensionsSet;
-        for ( const VkExtensionProperties& extension : availableExtensions )
-        {
-            availableExtensionsSet.insert( std::string( extension.extensionName ) );
-        }
-
-        // Check that each requested extension is available.
-        size_t missingExtensionsCount = 0;
-        for ( const char* extension : i_requestedExtensions )
-        {
-            std::unordered_set< std::string >::const_iterator extensionIt =
-                availableExtensionsSet.find( std::string( extension ) );
-
-            if ( extensionIt != availableExtensionsSet.end() )
-            {
-                printf( "Found requested Vulkan extension: %s.\n", extension );
-            }
-            else
-            {
-                printf( "Missing requested Vulkan extension: %s.\n", extension );
-                missingExtensionsCount++;
-            }
-        }
-
-        return missingExtensionsCount == 0;
-    }
-
     std::vector< const char* > GetRequiredExtensions() const
     {
         // Enable gflw interface extensions.
@@ -185,7 +116,7 @@ private:
         createInfo.pApplicationInfo     = &appInfo;
 
         // Check extensions support.
-        if ( m_enableValidationLayers && !CheckVulkanLayersSupport( m_validationLayers ) )
+        if ( m_enableValidationLayers && !vkbase::CheckVulkanLayersSupport( m_validationLayers ) )
         {
             throw std::runtime_error( "Missing vulkan layers, abort!" );
         }
@@ -207,7 +138,7 @@ private:
 
         // Check extensions support.
         std::vector< const char* > extensions = GetRequiredExtensions();
-        if ( !CheckVulkanExtensionsSupport( extensions ) )
+        if ( !vkbase::CheckVulkanExtensionsSupport( extensions ) )
         {
             throw std::runtime_error( "Missing vulkan extensions, abort!" );
         }

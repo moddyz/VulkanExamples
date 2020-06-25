@@ -48,4 +48,3 @@ inline std::vector< char > ReadFile( const std::string& i_filePath )
 
     return buffer;
 }
-
