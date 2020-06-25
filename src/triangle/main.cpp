@@ -686,10 +686,12 @@ private:
 
     void CreateGraphicsPipeline()
     {
-        std::string         executableDir   = GetParentDirectory( m_executablePath );
-        std::string         shaderDirectory = JoinPaths( executableDir, "../shaders/" );
-        std::vector< char > vertShaderCode  = ReadFile( JoinPaths( shaderDirectory, "shader.vert.spv" ) );
-        std::vector< char > fragShaderCode  = ReadFile( JoinPaths( shaderDirectory, "shader.frag.spv" ) );
+        std::string         executableDir   = vkbase::GetParentPath( m_executablePath );
+        std::string         shaderDirectory = vkbase::JoinPaths( executableDir, "../shaders/" );
+        std::vector< char > vertShaderCode =
+            vkbase::ReadFile( vkbase::JoinPaths( shaderDirectory, "shader.vert.spv" ) );
+        std::vector< char > fragShaderCode =
+            vkbase::ReadFile( vkbase::JoinPaths( shaderDirectory, "shader.frag.spv" ) );
 
         // Create shader modules from code.
         VkShaderModule vertShaderModule = CreateShaderModule( vertShaderCode );

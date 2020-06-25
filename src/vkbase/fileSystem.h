@@ -1,14 +1,13 @@
 #pragma once
 
-/// \file base/fileSystem.h
+/// \file vkbase/fileSystem.h
 ///
-/// File system utilities.
+/// Common file system utilities.
 
-inline std::string GetParentDirectory( const std::string& i_path )
+namespace vkbase
 {
-    return i_path.substr( 0, i_path.find_last_of( '/' ) );
-}
 
+/// Functor for backslash '/' detection.
 struct BothSlashes
 {
     bool operator()( char a, char b ) const
@@ -17,6 +16,8 @@ struct BothSlashes
     }
 };
 
+/// Sanitize the path \p i_path by reducing multiple consecutive forward slashes ("/")
+/// into a single one.
 inline std::string SanitizePath( const std::string& i_path )
 {
     std::string path = i_path;
@@ -24,19 +25,40 @@ inline std::string SanitizePath( const std::string& i_path )
     return path;
 }
 
-inline std::string JoinPaths( const std::string& i_pathA, const std::string& i_pathB )
+/// Get the path identified as the parent of \p i_path.
+///
+/// \param i_path the path to extract its parent from.
+///
+/// \return the parent path.
+inline std::string GetParentPath( const std::string& i_path )
 {
-    std::string path = i_pathA + "/" + i_pathB;
+    std::string sanitizedPath = SanitizePath( i_path );
+    return sanitizedPath.substr( 0, i_path.find_last_of( '/' ) );
+}
+
+/// Join two paths \p i_lhs and \p i_rhs by the "/" delimiter.
+///
+/// \param i_lhs the left hand side path.
+/// \param i_rhs the right hand side path.
+///
+/// \return the joined path.
+inline std::string JoinPaths( const std::string& i_lhs, const std::string& i_rhs )
+{
+    std::string path = i_lhs + "/" + i_rhs;
     return SanitizePath( path );
 }
 
-/// Read a file, and return the array of binary data.
+/// Read the file at \p i_filePath, and return an array of binary data.
+///
+/// \param i_filePath the path to the file to read.
+///
+/// \return the binary data in the form of a vector of bytes.
 inline std::vector< char > ReadFile( const std::string& i_filePath )
 {
     std::ifstream file( i_filePath, std::ios::ate | std::ios::binary );
     if ( !file.is_open() )
     {
-        throw std::runtime_error( "failed to open file!" );
+        throw std::runtime_error( "Failed to open file." );
     }
 
     // Read the entire file.
@@ -48,3 +70,5 @@ inline std::vector< char > ReadFile( const std::string& i_filePath )
 
     return buffer;
 }
+
+} // vkbase
