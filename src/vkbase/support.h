@@ -1,6 +1,6 @@
 #pragma once
 
-/// \file vkbase/utils.h
+/// \file vkbase/support.h
 ///
 /// Utilities for checking supported Vulkan features such as layers and extensions.
 
