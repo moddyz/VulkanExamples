@@ -5,7 +5,7 @@ Collection of experiments with the Vulkan Graphics API.
 ## Table of Contents
 
 - [Programs](#programs)
-  0. [Triangle](#0-triangle)
+  - [0. Triangle](#0-triangle)
 - [Building](#building)
   - [Requirements](#requirements)
 - [Build Status](#build-status)
